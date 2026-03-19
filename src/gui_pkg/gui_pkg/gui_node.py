@@ -127,7 +127,7 @@ class MainWindow(QWidget):
                                  "현재 Wi-Fi가 켜져 있습니다!\n학생들의 토픽과 충돌할 위험이 있습니다.\n\n우측 상단 메뉴에서 Wi-Fi를 끄고 다시 시도해 주세요.")
             return
 
-        reply = QMessageBox.question(self, '순차 실행', '와이파이가 꺼져있습니다. 모든 노드를 순서대로 켤까요?\n(각 노드별로 2초씩 대기합니다)',
+        reply = QMessageBox.question(self, '순차 실행', '와이파이가 꺼져있습니다. 모든 노드를 순서대로 켤까요?\n(각 노드별로 1초씩 대기합니다)',
                                      QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if reply == QMessageBox.No:
             return
@@ -139,7 +139,7 @@ class MainWindow(QWidget):
         for i, config in enumerate(self.nodes_config):
             if config["process"] is None:
                 self._run_node_process(i)
-                time.sleep(2.0) 
+                time.sleep(1.0) 
         
         self.ros_node.get_logger().info("모든 노드 실행 완료!")
 

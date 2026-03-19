@@ -79,6 +79,21 @@ class PathPlannerNode(Node):
         sorted_points = sorted(zip(y_points, x_points), key=lambda point: point[0])
         y_points, x_points = zip(*sorted_points)
 
+        # ── 추가: 중복 y값 제거 ──────────────────────────
+        seen_y = set()
+        deduped = []
+        for y, x in zip(y_points, x_points):
+            if y not in seen_y:
+                seen_y.add(y)
+                deduped.append((y, x))
+
+        if len(deduped) < self.cfg.min_target_points:
+            self.get_logger().warn("중복 제거 후 타겟 지점 부족. 경로 생성 건너뜀.")
+            return
+
+        y_points, x_points = zip(*deduped)
+        # ─────────────────────────────────────────────────
+
         # 스플라인 보간법 적용
         cs = CubicSpline(y_points, x_points, bc_type='natural')
 

@@ -112,6 +112,8 @@ class MotionPlanningNode(Node):
 
         # 지정된 시간(cycle_duration)마다 mode 전환
         if elapsed >= self.cfg.cycle_duration:
+            self.current_left_speed = 0   # 전환 시점에 속도를 0으로 만들어서 멈췄다가 방향 바꿔서 출발
+            self.current_right_speed = 0 
             self.mode = 1 - self.mode
             self.start_time = self.get_clock().now()
 
