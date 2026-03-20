@@ -1,3 +1,5 @@
+import os
+import signal
 import sys
 import threading
 import subprocess
@@ -148,7 +150,7 @@ class MainWindow(QWidget):
         cmd = ['ros2', 'run', config['pkg'], config['exec']]
         
         self.ros_node.get_logger().info(f"실행 중: {config['name']}")
-        process = subprocess.Popen(cmd)
+        process = subprocess.Popen(cmd, start_new_session=True)  # 새로운 세션에서 실행해서 그룹화
         config["process"] = process
         
         self.update_ui_signal.emit(index, True)
@@ -158,18 +160,61 @@ class MainWindow(QWidget):
             self._run_node_process(index)
 
     def stop_node(self, index):
+        # GUI 스레드에서 직접 호출될 경우를 위해 스레드로 감싸기
+        threading.Thread(target=self._stop_node_impl, args=(index,), daemon=True).start()
+
+    def _stop_node_impl(self, index):
         config = self.nodes_config[index]
-        if config["process"] is not None:
-            self.ros_node.get_logger().info(f"종료 중: {config['name']}")
-            config["process"].terminate() 
-            config["process"] = None
-            
-            self.update_ui_signal.emit(index, False)
+        if config["process"] is None:
+            return
+
+        self.ros_node.get_logger().info(f"종료 중: {config['name']}")
+
+        if config["exec"] == "serial_sender_node":
+            self._send_zero_motion_command()
+            time.sleep(0.3)
+
+        process = config["process"]
+
+        try:
+            os.killpg(os.getpgid(process.pid), signal.SIGINT)
+            process.wait(timeout=3.0)
+        except subprocess.TimeoutExpired:
+            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+            process.wait()
+        except ProcessLookupError:
+            pass
+
+        config["process"] = None
+        self.update_ui_signal.emit(index, False)
+
+    def _send_zero_motion_command(self):
+        from interfaces_pkg.msg import MotionCommand
+        from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy, QoSDurabilityPolicy
+
+        qos = QoSProfile(
+            reliability=QoSReliabilityPolicy.RELIABLE,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            durability=QoSDurabilityPolicy.VOLATILE,
+            depth=1
+        )
+        pub = self.ros_node.create_publisher(MotionCommand, 'topic_control_signal', qos)
+        msg = MotionCommand()
+        msg.steering = 0
+        msg.left_speed = 0
+        msg.right_speed = 0
+        pub.publish(msg)
+        self.ros_node.destroy_publisher(pub)
 
     def stop_all_nodes(self):
-        for i in range(len(self.nodes_config)):
-            self.stop_node(i)
+        self.btn_stop_all.setEnabled(False)  # 중복 클릭 방지
+        threading.Thread(target=self._stop_all_thread, daemon=True).start()
+
+    def _stop_all_thread(self):
+        for i in reversed(range(len(self.nodes_config))):
+            self._stop_node_impl(i)  # ← _stop_node_impl 직접 호출
         self.btn_start_all.setEnabled(True)
+        self.btn_stop_all.setEnabled(True)
 
     def update_node_status_ui(self, index, is_running):
         if is_running:
@@ -182,8 +227,12 @@ class MainWindow(QWidget):
             self.buttons_stop[index].setEnabled(False)
 
     def closeEvent(self, event):
-        self.stop_all_nodes()
-        event.accept()
+        event.ignore()
+        def _shutdown():
+            for i in reversed(range(len(self.nodes_config))):
+                self._stop_node_impl(i)  # ← 동일
+            QApplication.quit()
+        threading.Thread(target=_shutdown, daemon=True).start()
 
 # ==========================================
 # [3] Main 함수

@@ -29,7 +29,7 @@ class PathPlannerNode(Node):
     def __init__(self):
         super().__init__('path_planner_node')
 
-        # [모듈화 포인트] 파라미터 덩어리를 불러옵니다!
+        # [모듈화] 파라미터 덩어리를 불러옵니다!
         self.cfg = PathPlannerConfig()
 
         self.qos_profile = QoSProfile(
@@ -59,7 +59,7 @@ class PathPlannerNode(Node):
         # 후방 카메라 데이터를 공통 함수로 넘겨요
         self.generate_and_publish_path(msg.target_points, self.cfg.car_center_2, self.publisher_2)
 
-    # [모듈화 포인트] 중복되던 1번, 2번 함수를 하나로 합쳤어요!
+    # [모듈화] 중복되던 1번, 2번 함수를 하나로 합쳤어요!
     def generate_and_publish_path(self, target_points, car_center, publisher):
         
         # 타겟 지점이 충분한지 확인

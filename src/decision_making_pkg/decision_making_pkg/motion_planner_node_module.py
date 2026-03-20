@@ -43,7 +43,7 @@ class MotionPlanningNode(Node):
     def __init__(self):
         super().__init__('motion_planner_node')
 
-        # [모듈화 포인트] 파라미터 클래스 장착!
+        # [모듈화] 파라미터 클래스 장착!
         self.cfg = MotionPlannerConfig()
 
         self.qos_profile = QoSProfile(
