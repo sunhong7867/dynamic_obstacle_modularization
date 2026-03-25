@@ -169,9 +169,15 @@ def main(args=None):
     except KeyboardInterrupt:
         print("\n\nshutdown\n\n")
         pass
-    node.destroy_node()
-    if node.cap.isOpened():
+        
+    if hasattr(node, 'cap1') and node.cap1.isOpened():
+        node.cap1.release()
+    if hasattr(node, 'cap2') and node.cap2.isOpened():
+        node.cap2.release()
+    if hasattr(node, 'cap') and node.cap.isOpened():
         node.cap.release()
+    
+    node.destroy_node()
     cv2.destroyAllWindows()
     rclpy.shutdown()
   
