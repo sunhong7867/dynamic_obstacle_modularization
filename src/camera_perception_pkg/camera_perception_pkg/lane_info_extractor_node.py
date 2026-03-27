@@ -48,8 +48,8 @@ class Yolov8InfoExtractor(Node):
         self.src_mat_orig_ref_1 = [[238, 316],[402, 313], [501, 476], [155, 476]]  # 전방카메라 좌표
         self.src_mat_orig_ref_2 = [[169, 196], [434, 196], [605, 432], [0, 432]]  # 후방카메라 좌표 (적절히 수정 필요)
 
-        self.last_lane_width_1 = 350  # 각 카메라별로 마지막으로 측정된 차선 폭을 저장하는 변수
-        self.last_lane_width_2 = 250
+        self.last_lane_width_1 = 338  # 각 카메라별로 마지막으로 측정된 차선 폭을 저장하는 변수
+        self.last_lane_width_2 = 330
 
 
     def _fit_line_in_roi(self, roi_image, line_type_name):
@@ -83,8 +83,9 @@ class Yolov8InfoExtractor(Node):
             ransac.fit(X_data, y_target)
 
             inlier_mask = ransac.inlier_mask_
-            if np.sum(inlier_mask) < 2: 
-                self.get_logger().info(f"RANSAC found less than 2 inliers for {line_type_name}.")
+            if np.sum(inlier_mask) < 15:
+                self.get_logger().info(
+                    f"Too few inliers ({np.sum(inlier_mask)}) for {line_type_name}. 차선 미검출로 처리.")
                 return None
 
             slope_m = ransac.estimator_.coef_[0]  
@@ -243,6 +244,30 @@ class Yolov8InfoExtractor(Node):
                 pt1_roi_ind, pt2_roi_ind = self._get_line_endpoints_in_image(params_roi, h_roi_ind, w_roi_ind)
 
                 if pt1_roi_ind and pt2_roi_ind:
+                    x0_check = params_roi[2]  # RANSAC이 계산한 x절편
+                    roi_center_x = w_roi_ind / 2
+
+                    if callback_id == "1":
+                        # 왼쪽 차선(line)은 ROI 왼쪽 절반에, 오른쪽 차선(dotted_line)은 오른쪽 절반에 있어야 함
+                        if type_name == "line" and x0_check > roi_center_x:
+                            self.get_logger().warn(
+                                f"[1] line x0({x0_check:.1f}) > 중앙({roi_center_x:.1f}): 위치 이상, 버림")
+                            continue
+                        if type_name == "dotted_line" and x0_check < roi_center_x:
+                            self.get_logger().warn(
+                                f"[1] dotted_line x0({x0_check:.1f}) < 중앙({roi_center_x:.1f}): 위치 이상, 버림")
+                            continue
+                    elif callback_id == "2":
+                        # 카메라 2는 좌우 배치가 다르면 여기서 조정
+                        if type_name == "dotted_line" and x0_check > roi_center_x:
+                            self.get_logger().warn(
+                                f"[2] dotted_line x0({x0_check:.1f}) > 중앙({roi_center_x:.1f}): 위치 이상, 버림")
+                            continue
+                        if type_name == "line" and x0_check < roi_center_x:
+                            self.get_logger().warn(
+                                f"[2] line x0({x0_check:.1f}) < 중앙({roi_center_x:.1f}): 위치 이상, 버림")
+                            continue
+
                     # 1. 원본 공간 시각화 (vis_image_orig_space)
                     pt1_bird_transform = (pt1_roi_ind[0], pt1_roi_ind[1] + cutting_idx) # 좌표계 변환을 위한 점
                     pt2_bird_transform = (pt2_roi_ind[0], pt2_roi_ind[1] + cutting_idx) # 좌표계 변환을 위한 점
@@ -284,15 +309,42 @@ class Yolov8InfoExtractor(Node):
         display_all_lane_bird_image = all_lane_bird_image_combined
         # --- 보정용 반대 차선 예측 ---
         if len(fitted_results) == 2:
-            x0_line = fitted_results['line'][0][2]        # 왼쪽 차선 x절편
-            x0_dot  = fitted_results['dotted_line'][0][2] # 오른쪽 차선 x절편
+            x0_line = fitted_results['line'][0][2]
+            x0_dot  = fitted_results['dotted_line'][0][2]
             measured_width = abs(x0_dot - x0_line)
-            if 150 < measured_width < 600:  # 비정상값 필터링
+            lane_width_ref = self.last_lane_width_1 if callback_id == "1" else self.last_lane_width_2
+
+            # 기존 역전 감지
+            if callback_id == "1" and x0_line >= x0_dot:
+                self.get_logger().warn(f"[{callback_id}] line 역전 감지. 예측으로 대체.")
+                del fitted_results['line']
+
+            elif callback_id == "2" and x0_dot >= x0_line:
+                self.get_logger().warn(f"[{callback_id}] dotted_line 역전 감지. 예측으로 대체.")
+                del fitted_results['dotted_line']
+
+            # 추가: 폭 이상 감지 (정상 폭의 70% 미만이면 왼쪽 차선 오염 의심)
+            elif lane_width_ref > 0 and measured_width < lane_width_ref * 0.7:
                 if callback_id == "1":
-                    self.last_lane_width_1 = measured_width
+                    self.get_logger().warn(
+                        f"[1] 측정 폭({measured_width:.1f}) < 기준 폭({lane_width_ref:.1f}) * 0.7. "
+                        f"line 오염 의심. 예측으로 대체.")
+                    del fitted_results['line']
                 else:
-                    self.last_lane_width_2 = measured_width
-        
+                    self.get_logger().warn(
+                        f"[2] 측정 폭({measured_width:.1f}) < 기준 폭({lane_width_ref:.1f}) * 0.7. "
+                        f"dotted_line 오염 의심. 예측으로 대체.")
+                    del fitted_results['dotted_line']
+
+            # 정상일 때만 폭 업데이트
+            if len(fitted_results) == 2:
+                self.get_logger().info(f"[{callback_id}] 양쪽 차선 정상. 폭: {measured_width:.2f}")
+                if 150 < measured_width < 600:
+                    if callback_id == "1":
+                        self.last_lane_width_1 = measured_width
+                    else:
+                        self.last_lane_width_2 = measured_width
+                
         if len(fitted_results) == 1:
             existing_type = list(fitted_results.keys())[0]
             params_roi, (h_roi, w_roi) = fitted_results[existing_type]
@@ -316,6 +368,12 @@ class Yolov8InfoExtractor(Node):
                 self.get_logger().info(
                     f"{existing_type}: Predicted opposite lane added with offset {lane_width} for callback_id={callback_id}."
                 )
+
+        # 두 차선 모두 검출 실패 시 발행하지 않음
+        if len(fitted_results) == 0:
+            self.get_logger().warn(f"[{callback_id}] 유효한 차선 없음. 이번 프레임 건너뜀.")
+            return vis_image_orig_space, display_all_lane_bird_image, None  # None 반환
+            
         return vis_image_orig_space, display_all_lane_bird_image, roi_image_for_laneinfo
 
 
