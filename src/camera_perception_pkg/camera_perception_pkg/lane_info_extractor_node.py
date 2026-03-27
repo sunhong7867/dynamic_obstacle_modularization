@@ -48,6 +48,9 @@ class Yolov8InfoExtractor(Node):
         self.src_mat_orig_ref_1 = [[238, 316],[402, 313], [501, 476], [155, 476]]  # 전방카메라 좌표
         self.src_mat_orig_ref_2 = [[169, 196], [434, 196], [605, 432], [0, 432]]  # 후방카메라 좌표 (적절히 수정 필요)
 
+        self.last_lane_width_1 = 350  # 각 카메라별로 마지막으로 측정된 차선 폭을 저장하는 변수
+        self.last_lane_width_2 = 250
+
 
     def _fit_line_in_roi(self, roi_image, line_type_name):
         """
@@ -279,21 +282,30 @@ class Yolov8InfoExtractor(Node):
         
         # 표시용 all_lane_bird_image는 합쳐진 BEV 이미지를 사용
         display_all_lane_bird_image = all_lane_bird_image_combined
-                # --- 보정용 반대 차선 예측 ---
+        # --- 보정용 반대 차선 예측 ---
+        if len(fitted_results) == 2:
+            x0_line = fitted_results['line'][0][2]        # 왼쪽 차선 x절편
+            x0_dot  = fitted_results['dotted_line'][0][2] # 오른쪽 차선 x절편
+            measured_width = abs(x0_dot - x0_line)
+            if 150 < measured_width < 600:  # 비정상값 필터링
+                if callback_id == "1":
+                    self.last_lane_width_1 = measured_width
+                else:
+                    self.last_lane_width_2 = measured_width
+        
         if len(fitted_results) == 1:
             existing_type = list(fitted_results.keys())[0]
             params_roi, (h_roi, w_roi) = fitted_results[existing_type]
             vx, vy, x0, y0 = params_roi
-            front_offset = 350
-            back_offset = 250
+            lane_width = self.last_lane_width_1 if callback_id == "1" else self.last_lane_width_2
 
             # callback_id에 따라 왼쪽/오른쪽 차선 클래스가 다르므로 offset 방향을 다르게 적용
             if callback_id == "1":
                 # line: 왼쪽, dotted_line: 오른쪽
-                x0_new = x0 + front_offset if existing_type == 'line' else x0 - front_offset
+                x0_new = x0 + lane_width if existing_type == 'line' else x0 - lane_width
             elif callback_id == "2":
                 # dotted_line: 왼쪽, line: 오른쪽
-                x0_new = x0 + back_offset if existing_type == 'dotted_line' else x0 - back_offset
+                x0_new = x0 + lane_width if existing_type == 'dotted_line' else x0 - lane_width
             else:
                 x0_new = x0  # fallback
 
@@ -302,7 +314,7 @@ class Yolov8InfoExtractor(Node):
             if pt1_pred and pt2_pred:
                 cv2.line(roi_image_for_laneinfo, pt1_pred, pt2_pred, 255, 1)
                 self.get_logger().info(
-                    f"{existing_type}: Predicted opposite lane added with offset {front_offset} for callback_id={callback_id}."
+                    f"{existing_type}: Predicted opposite lane added with offset {lane_width} for callback_id={callback_id}."
                 )
         return vis_image_orig_space, display_all_lane_bird_image, roi_image_for_laneinfo
 

@@ -75,6 +75,12 @@ class MainWindow(QWidget):
         self.btn_serial_fix.clicked.connect(self.fix_serial_permission)
         main_layout.addWidget(self.btn_serial_fix)
 
+        # CUDA 초기화 오류 복구 버튼
+        self.btn_cuda_fix = QPushButton('⚡ CUDA 초기화 오류 복구 (sudo)', self)
+        self.btn_cuda_fix.setStyleSheet("background-color: #FF9800; color: black;")
+        self.btn_cuda_fix.clicked.connect(self.fix_cuda)
+        main_layout.addWidget(self.btn_cuda_fix)
+
         # 개별 노드 컨트롤 목록 생성
         for i, config in enumerate(self.nodes_config):
             row_layout = QHBoxLayout()
@@ -225,6 +231,25 @@ class MainWindow(QWidget):
             self.labels_status[index].setText('🔴 중지됨')
             self.buttons_start[index].setEnabled(True)
             self.buttons_stop[index].setEnabled(False)
+
+    def fix_cuda(self):
+        reply = QMessageBox.question(self, 'CUDA 복구',
+            'NVIDIA UVM 모듈을 재시작합니다.\n실행 중인 YOLOv8 노드가 있으면 먼저 종료하세요.\n\n계속하시겠습니까?',
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.No:
+            return
+        try:
+            subprocess.Popen([
+                'gnome-terminal', '--', 'bash', '-c',
+                'echo "NVIDIA UVM 모듈 재시작 중..."; '
+                'sudo rmmod nvidia_uvm && sudo modprobe nvidia_uvm && '
+                'echo "✅ 완료! 이 창을 닫고 YOLOv8 노드를 다시 실행하세요." || '
+                'echo "❌ 실패. nvidia-smi 상태를 확인하세요."; '
+                'exec bash'
+            ])
+        except Exception as e:
+            QMessageBox.warning(self, "오류", f"명령 실행 실패: {e}")
+    
 
     def closeEvent(self, event):
         event.ignore()
