@@ -15,10 +15,10 @@ class MotionPlannerConfig:
 
         # --- [Time & Mode] ---
         self.timer_period = 0.1         # 모션 제어 주기 (초)
-        self.cycle_duration = 14.5      # 전진/후진 전환 시간 (초)
+        self.cycle_duration = 15      # 전진/후진 전환 시간 (초)
 
         # --- [Speed & Accel] ---
-        self.forward_speed = 100        # 전진 목표 속도
+        self.forward_speed = 103        # 전진 목표 속도
         self.backward_speed = -100      # 후진 목표 속도
         self.max_accel_step = 10        # 속도가 부드럽게 변하는 단위
 
