@@ -15,10 +15,11 @@ class MotionPlannerConfig:
 
         # --- [Time & Mode] ---
         self.timer_period = 0.1         # 모션 제어 주기 (초)
-        self.cycle_duration = 15      # 전진/후진 전환 시간 (초)
+        self.forward_cycle_duration = 15.5   # 전진 시간
+        self.backward_cycle_duration = 14.5  # 후진 시간
 
         # --- [Speed & Accel] ---
-        self.forward_speed = 103        # 전진 목표 속도
+        self.forward_speed = 100        # 전진 목표 속도
         self.backward_speed = -100      # 후진 목표 속도
         self.max_accel_step = 10        # 속도가 부드럽게 변하는 단위
 
@@ -110,8 +111,13 @@ class MotionPlanningNode(Node):
 
         elapsed = (self.get_clock().now() - self.start_time).nanoseconds * 1e-9
 
+        current_duration = (
+            self.cfg.forward_cycle_duration if self.mode == 0
+            else self.cfg.backward_cycle_duration
+        )
+
         # 지정된 시간(cycle_duration)마다 mode 전환
-        if elapsed >= self.cfg.cycle_duration:
+        if elapsed >= current_duration:
             self.current_left_speed = 0   # 전환 시점에 속도를 0으로 만들어서 멈췄다가 방향 바꿔서 출발
             self.current_right_speed = 0 
             self.mode = 1 - self.mode
