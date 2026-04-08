@@ -143,12 +143,3 @@ rosdep install --from-paths src --ignore-src -r -y
 colcon build --symlink-install
 source install/setup.bash
 ```
-
----
-
-## 9. 핵심 정리
-
-- Ubuntu 24.04에서는 보통 **ROS 2 Jazzy**를 사용함
-- `/opt/ros/jazzy/setup.bash`가 없었던 이유는 **Jazzy가 설치되지 않았기 때문**
-- `universe` 저장소를 활성화한 뒤 ROS 2 저장소를 추가하고 Jazzy를 설치해야 함
-- `ros-apt-source`가 아니라 **`ros2-apt-source`**가 맞는 패키지명임
