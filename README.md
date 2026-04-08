@@ -88,6 +88,7 @@ source install/setup.bash
 ```bash
 sudo apt install python3-colcon-common-extensions python3-rosdep -y
 sudo rosdep init
+pip install opencv-python ultralytics
 rosdep update
 ```
 
@@ -99,4 +100,13 @@ cd ~/dynamic_obstacle_modularization-main
 rosdep install --from-paths src --ignore-src -r -y
 colcon build --symlink-install
 source install/setup.bash
+```
+
+## 9. 가상환경 설정
+```bash
+# 가상환경 생성
+python3 -m venv skku
+
+# 가상환경 활성화
+source ~/venv/skku/bin/activate
 ```
