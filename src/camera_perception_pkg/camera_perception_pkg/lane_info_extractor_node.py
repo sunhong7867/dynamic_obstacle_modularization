@@ -458,7 +458,7 @@ class Yolov8InfoExtractor(Node):
                                                     detection_thickness=10, road_gradient=grad, lane_width=300)
                 if target_point_x_roi is not None:
                     target_point = TargetPoint()
-                    target_point.target_x = round(float(target_point_x_roi)) - 10
+                    target_point.target_x = round(float(target_point_x_roi))
                     target_point.target_y = round(float(target_point_y_roi)) 
                     target_points.append(target_point)
         else:
