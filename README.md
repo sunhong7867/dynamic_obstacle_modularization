@@ -77,6 +77,10 @@ source /opt/ros/jazzy/setup.bash
 cd ~/dynamic_obstacle_modularization-main
 colcon build --symlink-install
 source install/setup.bash
+
+ros2 run gui_pkg gui_node
+python3 src/data_collection/data_collection.py
+
 ```
 
 ---
