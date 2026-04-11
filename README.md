@@ -92,21 +92,3 @@ pip install opencv-python ultralytics
 rosdep update
 ```
 
-필요하면 이후에는 다음처럼 의존성을 먼저 설치할 수 있음.
-
-```bash
-source /opt/ros/jazzy/setup.bash
-cd ~/dynamic_obstacle_modularization-main
-rosdep install --from-paths src --ignore-src -r -y
-colcon build --symlink-install
-source install/setup.bash
-```
-
-## 9. 가상환경 설정
-```bash
-# 가상환경 생성
-python3 -m venv skku
-
-# 가상환경 활성화
-source ~/venv/skku/bin/activate
-```
