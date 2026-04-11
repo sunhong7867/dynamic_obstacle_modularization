@@ -94,5 +94,7 @@ sudo apt install python3-colcon-common-extensions python3-rosdep -y
 sudo rosdep init
 pip install opencv-python ultralytics
 rosdep update
+
+sudo chmod 666 /dev/ttyACM0
 ```
 
